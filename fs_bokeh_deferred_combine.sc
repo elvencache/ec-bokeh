@@ -34,6 +34,9 @@ void main()
 {
 	vec2 texCoord = v_texcoord0;
 
+	vec3 color = texture2D(s_color, texCoord).xyz;
+	color = toLinear(color);
+
 	vec4 normalRoughness = texture2D(s_normal, texCoord).xyzw;
 	vec3 normal = NormalDecode(normalRoughness.xyz);
 	float roughness = normalRoughness.w;
@@ -56,11 +59,10 @@ void main()
 	vec3 viewSpacePosition = NDCToViewspace(texCoord, linearDepth);
 
 	vec3 light = (u_lightPosition - viewSpacePosition);
-	float lightDistSq = dot(light, light) + 1e-5;
 	light = normalize(light);
 
 	float NdotL = saturate(dot(vsNormal, light));
-	float diffuse = NdotL * (1.0/lightDistSq);
+	float diffuse = NdotL * 1.0;
 	
 	vec3 V = -normalize(viewSpacePosition);
 	vec3 H = normalize(V+light);
@@ -68,6 +70,8 @@ void main()
 	float specular = 5.0 * pow(NdotH, specPower);
 
 	float lightAmount = mix(diffuse, specular, 0.04);
+	color *= lightAmount;
+	color = toGamma(color);
 
-	gl_FragColor = vec4(vec3_splat(lightAmount), 1.0);
+	gl_FragColor = vec4(color, 1.0);
 }

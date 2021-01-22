@@ -260,9 +260,6 @@ public:
 			m_meshes[ii] = meshLoad(s_meshPaths[ii]);
 		}
 
-		// sphere is first mesh
-		m_lightModel.mesh = 0;
-
 		// Randomly create some models
 		bx::RngMwc mwc;
 		for (uint32_t ii = 0; ii < BX_COUNTOF(m_models); ++ii)
@@ -808,9 +805,7 @@ public:
 		m_uniforms.m_frameIdx = float(m_currFrame % 8);
 
 		{
-			float lightPosition[4];
-			bx::memCopy(lightPosition, m_lightModel.position, 3*sizeof(float));
-			lightPosition[3] = 1.0f;
+			float lightPosition[] = { -10.0f, 10.0f, -10.0f, 1.0f };
 			float viewSpaceLightPosition[4];
 			bx::vec4MulMtx(viewSpaceLightPosition, lightPosition, m_view);
 			bx::memCopy(m_uniforms.m_lightPosition, viewSpaceLightPosition, 3*sizeof(float));
@@ -872,7 +867,6 @@ public:
 		float position[3];
 	};
 
-	Model m_lightModel;
 	Model m_models[MODEL_COUNT];
 	Mesh* m_meshes[BX_COUNTOF(s_meshPaths)];
 	Mesh* m_ground;
