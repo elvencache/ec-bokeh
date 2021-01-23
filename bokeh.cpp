@@ -26,8 +26,7 @@ namespace {
 
 enum Meshes
 {
-	MeshSphere = 0,
-	MeshCube,
+	MeshCube = 0,
 	MeshTree,
 	MeshHollowCube,
 	MeshBunny
@@ -35,7 +34,6 @@ enum Meshes
 
 static const char * s_meshPaths[] =
 {
-	"meshes/unit_sphere.bin",
 	"meshes/cube.bin",
 	"meshes/tree.bin",
 	"meshes/hollowcube.bin",
@@ -44,9 +42,8 @@ static const char * s_meshPaths[] =
 
 static const float s_meshScale[] =
 {
-	0.15f,
-	0.05f,
-	0.15f,
+	0.25f,
+	0.25f,
 	0.25f,
 	0.25f
 };
@@ -551,7 +548,7 @@ public:
 		return false;
 	}
 
-	void drawAllModels(bgfx::ViewId _pass, bgfx::ProgramHandle _program, const ModelUniforms & _uniforms)
+	void drawAllModels(bgfx::ViewId _pass, bgfx::ProgramHandle _program, ModelUniforms & _uniforms)
 	{
 		for (uint32_t ii = 0; ii < BX_COUNTOF(m_models); ++ii)
 		{
@@ -574,6 +571,9 @@ public:
 
 			bgfx::setTexture(0, s_albedo, m_groundTexture);
 			bgfx::setTexture(1, s_normal, m_normalTexture);
+			_uniforms.m_color[0] = bx::fract(float(ii)/10.0f) * 0.6f + 0.2f;
+			_uniforms.m_color[1] = bx::fract(float(ii)/25.0f) * 0.6f + 0.2f;
+			_uniforms.m_color[2] = bx::fract(float(ii)/50.0f) * 0.6f + 0.2f;
 			_uniforms.submit();
 
 			meshSubmit(m_meshes[model.mesh], _pass, _program, mtx);
@@ -705,8 +705,6 @@ public:
 		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, pointSampleFlags);
 		m_frameBuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_frameBufferTex), m_frameBufferTex, true);
 
-		m_currentColor.init(m_size[0], m_size[1], bgfx::TextureFormat::RG11B10F, bilinearFlags);
-		m_temporaryColor.init(m_size[0], m_size[1], bgfx::TextureFormat::RG11B10F, bilinearFlags);
 		m_linearDepth.init(m_size[0], m_size[1], bgfx::TextureFormat::R16F, pointSampleFlags);
 
 		unsigned halfWidth = m_size[0]/2;
@@ -720,8 +718,6 @@ public:
 	{
 		bgfx::destroy(m_frameBuffer);
 
-		m_currentColor.destroy();
-		m_temporaryColor.destroy();
 		m_linearDepth.destroy();
 		m_dofQuarterInput.destroy();
 		m_dofQuarterOutput.destroy();
@@ -811,8 +807,6 @@ public:
 	bgfx::FrameBufferHandle m_frameBuffer;
 	bgfx::TextureHandle m_frameBufferTex[FRAMEBUFFER_RENDER_TARGETS];
 
-	RenderTarget m_currentColor;
-	RenderTarget m_temporaryColor; // need another buffer to ping-pong results
 	RenderTarget m_linearDepth;
 	RenderTarget m_dofQuarterInput;
 	RenderTarget m_dofQuarterOutput;

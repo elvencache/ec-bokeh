@@ -74,7 +74,7 @@ void main()
 	float specular = 5.0 * pow(NdotH, specPower);
 
 	float lightAmount = mix(diffuse, specular, 0.04);
-	vec3 color = albedo * lightAmount;
+	vec3 color = u_color * albedo * lightAmount;
 	color = toGamma(color);
 
 	gl_FragColor = vec4(color, 1.0);
