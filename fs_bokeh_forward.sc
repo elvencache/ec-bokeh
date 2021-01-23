@@ -1,11 +1,16 @@
 $input v_normal, v_texcoord0, v_texcoord1, v_texcoord2
 
 #include "../common/common.sh"
-#include "parameters.sh"
-#include "normal_encoding.sh"
 
 SAMPLER2D(s_albedo, 0);
 SAMPLER2D(s_normal, 1);
+
+// struct ModelUniforms
+uniform vec4 u_params[2];
+
+#define u_color				(u_params[0].xyz)
+#define u_lightPosition		(u_params[1].xyz)
+
 
 // http://www.thetenthplanet.de/archives/1180
 // "followup: normal mapping without precomputed tangents"
@@ -73,8 +78,4 @@ void main()
 	color = toGamma(color);
 
 	gl_FragColor = vec4(color, 1.0);
-
-	//vec3 bufferNormal = NormalEncode(bumpedNormal);
-	//gl_FragData[0] = vec4(toGamma(albedo), 1.0);
-	//gl_FragData[1] = vec4(bufferNormal, roughness);
 }

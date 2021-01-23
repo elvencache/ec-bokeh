@@ -74,9 +74,9 @@ struct PosTexCoord0Vertex
 
 bgfx::VertexLayout PosTexCoord0Vertex::ms_layout;
 
-struct Uniforms
+struct PassUniforms
 {
-	enum { NumVec4 = 13 };
+	enum { NumVec4 = 4 };
 
 	void init() {
 		u_params = bgfx::createUniform("u_params", bgfx::UniformType::Vec4, NumVec4);
@@ -96,11 +96,38 @@ struct Uniforms
 		{
 			/* 0    */ struct { float m_depthUnpackConsts[2]; float m_frameIdx; float m_unused0; };
 			/* 1    */ struct { float m_ndcToViewMul[2]; float m_ndcToViewAdd[2]; };
-			/* 2    */ struct { float m_lightPosition[3]; float m_unused2; };
-			/* 3    */ struct { float m_blurSteps; float m_useSqrtDistribution; float m_unused3[2]; };
-			/* 4    */ struct { float m_maxBlurSize; float m_focusPoint; float m_focusScale; float m_radiusScale; };
-			/* 5-8  */ struct { float m_worldToView[16]; }; // built-in u_view will be transform for quad during screen passes
-			/* 9-12 */ struct { float m_viewToProj[16]; };	 // built-in u_proj will be transform for quad during screen passes
+			/* 2    */ struct { float m_blurSteps; float m_useSqrtDistribution; float m_unused3[2]; };
+			/* 3    */ struct { float m_maxBlurSize; float m_focusPoint; float m_focusScale; float m_radiusScale; };
+		};
+
+		float m_params[NumVec4 * 4];
+	};
+
+	bgfx::UniformHandle u_params;
+};
+
+struct ModelUniforms
+{
+	enum { NumVec4 = 2 };
+
+	void init() {
+		u_params = bgfx::createUniform("u_params", bgfx::UniformType::Vec4, NumVec4);
+	};
+
+	void submit() const {
+		bgfx::setUniform(u_params, m_params, NumVec4);
+	};
+
+	void destroy() {
+		bgfx::destroy(u_params);
+	}
+
+	union
+	{
+		struct
+		{
+			/* 0 */ struct { float m_color[3]; float m_unused0; };
+			/* 1 */ struct { float m_lightPosition[3]; float m_unused1; };
 		};
 
 		float m_params[NumVec4 * 4];
@@ -202,14 +229,6 @@ void vec4Set(float* _v, float _x, float _y, float _z, float _w)
 	_v[3] = _w;
 }
 
-void mat4Set(float * _m, const float * _src)
-{
-	const uint32_t MAT4_FLOATS = 16;
-	for (uint32_t ii = 0; ii < MAT4_FLOATS; ++ii) {
-		_m[ii] = _src[ii];
-	}
-}
-
 class ExampleBokeh : public entry::AppI
 {
 public:
@@ -241,8 +260,9 @@ public:
 		// Enable debug text.
 		bgfx::setDebug(m_debug);
 
-		// Create uniforms
+		// Create uniforms for screen passes and models
 		m_uniforms.init();
+		m_modelUniforms.init();
 
 		// Create texture sampler uniforms (used when we bind textures)
 		s_albedo = bgfx::createUniform("s_albedo", bgfx::UniformType::Sampler);
@@ -323,6 +343,7 @@ public:
 		bgfx::destroy(m_dofCombineProgram);
 
 		m_uniforms.destroy();
+		m_modelUniforms.destroy();
 
 		bgfx::destroy(s_albedo);
 		bgfx::destroy(s_color);
@@ -403,7 +424,7 @@ public:
 					| BGFX_STATE_DEPTH_TEST_LESS
 					);
 
-				drawAllModels(view, m_forwardProgram, m_uniforms);
+				drawAllModels(view, m_forwardProgram, m_modelUniforms);
 
 				++view;
 			}
@@ -435,46 +456,10 @@ public:
 				++view;
 			}
 
-			// update last texture written, to chain passes together
-			bgfx::TextureHandle lastTex = m_frameBufferTex[FRAMEBUFFER_RT_COLOR];
-
-			//// Copy color result to swap chain
-			//{
-			//	bgfx::setViewName(view, "display");
-			//	bgfx::setViewClear(view
-			//		, BGFX_CLEAR_NONE
-			//		, 0
-			//		, 1.0f
-			//		, 0
-			//	);
-
-			//	bgfx::setViewRect(view, 0, 0, uint16_t(m_width), uint16_t(m_height));
-			//	bgfx::setViewTransform(view, NULL, orthoProj);
-
-			//	if (m_useBokehDof)
-			//	{
-			//		bgfx::setViewFrameBuffer(view, m_temporaryColor.m_buffer);
-			//	}
-			//	else
-			//	{
-			//		bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
-			//	}
-
-			//	bgfx::setState(0
-			//		| BGFX_STATE_WRITE_RGB
-			//		| BGFX_STATE_WRITE_A
-			//		);
-			//	bgfx::setTexture(0, s_color, lastTex);
-			//	screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
-			//	bgfx::submit(view, m_copyProgram);
-			//	++view;
-			//	lastTex = m_temporaryColor.m_texture;
-			//}
-
 			// optionally, apply dof
 			if (m_useBokehDof)
 			{
-				view = drawDepthOfField(view, lastTex, orthoProj, caps->originBottomLeft);
+				view = drawDepthOfField(view, m_frameBufferTex[FRAMEBUFFER_RT_COLOR], orthoProj, caps->originBottomLeft);
 			}
 			else
 			{
@@ -493,7 +478,7 @@ public:
 					| BGFX_STATE_WRITE_RGB
 					| BGFX_STATE_WRITE_A
 					);
-				bgfx::setTexture(0, s_color, lastTex);
+				bgfx::setTexture(0, s_color, m_frameBufferTex[FRAMEBUFFER_RT_COLOR]);
 				screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
 				bgfx::submit(view, m_copyProgram);
 				++view;
@@ -566,7 +551,7 @@ public:
 		return false;
 	}
 
-	void drawAllModels(bgfx::ViewId _pass, bgfx::ProgramHandle _program, const Uniforms & _uniforms)
+	void drawAllModels(bgfx::ViewId _pass, bgfx::ProgramHandle _program, const ModelUniforms & _uniforms)
 	{
 		for (uint32_t ii = 0; ii < BX_COUNTOF(m_models); ++ii)
 		{
@@ -716,8 +701,8 @@ public:
 			| BGFX_SAMPLER_MIP_POINT
 			;
 
-		m_frameBufferTex[FRAMEBUFFER_RT_COLOR]    = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, pointSampleFlags);
-		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH]    = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, pointSampleFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_COLOR] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, pointSampleFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, pointSampleFlags);
 		m_frameBuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_frameBufferTex), m_frameBufferTex, true);
 
 		m_currentColor.init(m_size[0], m_size[1], bgfx::TextureFormat::RG11B10F, bilinearFlags);
@@ -744,9 +729,6 @@ public:
 
 	void updateUniforms()
 	{
-		mat4Set(m_uniforms.m_worldToView, m_view);
-		mat4Set(m_uniforms.m_viewToProj, m_proj);
-
 		// from assao sample, cs_assao_prepare_depths.sc
 		{
 			// float depthLinearizeMul = ( clipFar * clipNear ) / ( clipFar - clipNear );
@@ -782,7 +764,7 @@ public:
 
 		{
 			float lightPosition[] = { -10.0f, 10.0f, -10.0f };
-			bx::memCopy(m_uniforms.m_lightPosition, lightPosition, 3*sizeof(float));
+			bx::memCopy(m_modelUniforms.m_lightPosition, lightPosition, 3*sizeof(float));
 		}
 
 		// bokeh depth of field
@@ -816,7 +798,8 @@ public:
 	bgfx::ProgramHandle m_dofCombineProgram;
 
 	// Shader uniforms
-	Uniforms m_uniforms;
+	PassUniforms m_uniforms;
+	ModelUniforms m_modelUniforms;
 
 	// Uniforms to indentify texture samplers
 	bgfx::UniformHandle s_albedo;
