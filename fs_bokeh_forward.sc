@@ -73,4 +73,8 @@ void main()
 	color = toGamma(color);
 
 	gl_FragColor = vec4(color, 1.0);
+
+	//vec3 bufferNormal = NormalEncode(bumpedNormal);
+	//gl_FragData[0] = vec4(toGamma(albedo), 1.0);
+	//gl_FragData[1] = vec4(bufferNormal, roughness);
 }

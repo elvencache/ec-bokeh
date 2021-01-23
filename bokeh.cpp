@@ -18,11 +18,9 @@
 
 namespace {
 
-// Gbuffer has multiple render targets
-#define GBUFFER_RT_COLOR		0
-#define GBUFFER_RT_NORMAL		1
-#define GBUFFER_RT_DEPTH		2
-#define GBUFFER_RENDER_TARGETS	3
+#define FRAMEBUFFER_RT_COLOR		0
+#define FRAMEBUFFER_RT_DEPTH		1
+#define FRAMEBUFFER_RENDER_TARGETS	2
 
 #define MODEL_COUNT				100
 
@@ -238,15 +236,14 @@ public:
 		m_uniforms.init();
 
 		// Create texture sampler uniforms (used when we bind textures)
-		s_albedo = bgfx::createUniform("s_albedo", bgfx::UniformType::Sampler); // Model's source albedo
-		s_color = bgfx::createUniform("s_color", bgfx::UniformType::Sampler); // Color (albedo) gbuffer, default color input
-		s_normal = bgfx::createUniform("s_normal", bgfx::UniformType::Sampler); // Normal gbuffer, Model's source normal
-		s_depth = bgfx::createUniform("s_depth", bgfx::UniformType::Sampler); // Depth gbuffer
+		s_albedo = bgfx::createUniform("s_albedo", bgfx::UniformType::Sampler);
+		s_color = bgfx::createUniform("s_color", bgfx::UniformType::Sampler);
+		s_normal = bgfx::createUniform("s_normal", bgfx::UniformType::Sampler);
+		s_depth = bgfx::createUniform("s_depth", bgfx::UniformType::Sampler);
 		s_blurredColor = bgfx::createUniform("s_blurredColor", bgfx::UniformType::Sampler);
 
 		// Create program from shaders.
-		m_gbufferProgram			= loadProgram("vs_bokeh_gbuffer",		"fs_bokeh_gbuffer");			// Fill gbuffer
-		m_combineProgram			= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_deferred_combine");	// Compute lighting from gbuffer
+		m_forwardProgram			= loadProgram("vs_bokeh_forward",		"fs_bokeh_forward");
 		m_copyProgram				= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_copy"); 
 		m_linearDepthProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_linear_depth");
 		m_dofSinglePassProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_single_pass");
@@ -312,8 +309,7 @@ public:
 		bgfx::destroy(m_normalTexture);
 		bgfx::destroy(m_groundTexture);
 
-		bgfx::destroy(m_gbufferProgram);
-		bgfx::destroy(m_combineProgram);
+		bgfx::destroy(m_forwardProgram);
 		bgfx::destroy(m_copyProgram);
 		bgfx::destroy(m_linearDepthProgram);
 		bgfx::destroy(m_dofSinglePassProgram);
@@ -371,7 +367,6 @@ public:
 			// Update camera
 			cameraUpdate(deltaTime*0.15f, m_mouseState);
 
-			// Set up matrices for gbuffer
 			cameraGetViewMtx(m_view);
 
 			updateUniforms();
@@ -382,9 +377,9 @@ public:
 
 			bgfx::ViewId view = 0;
 
-			// Draw everything into gbuffer
+			// Draw models into scene
 			{
-				bgfx::setViewName(view, "gbuffer");
+				bgfx::setViewName(view, "forward scene");
 				bgfx::setViewClear(view
 					, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH
 					, 0
@@ -394,8 +389,7 @@ public:
 
 				bgfx::setViewRect(view, 0, 0, uint16_t(m_size[0]), uint16_t(m_size[1]));
 				bgfx::setViewTransform(view, m_view, m_proj);
-				// Make sure when we draw it goes into gbuffer and not backbuffer
-				bgfx::setViewFrameBuffer(view, m_gbuffer);
+				bgfx::setViewFrameBuffer(view, m_frameBuffer);
 
 				bgfx::setState(0
 					| BGFX_STATE_WRITE_RGB
@@ -404,7 +398,7 @@ public:
 					| BGFX_STATE_DEPTH_TEST_LESS
 					);
 
-				drawAllModels(view, m_gbufferProgram, m_uniforms);
+				drawAllModels(view, m_forwardProgram, m_uniforms);
 
 				++view;
 			}
@@ -429,37 +423,16 @@ public:
 					| BGFX_STATE_WRITE_A
 					| BGFX_STATE_DEPTH_TEST_ALWAYS
 					);
-				bgfx::setTexture(0, s_depth, m_gbufferTex[GBUFFER_RT_DEPTH]);
+				bgfx::setTexture(0, s_depth, m_frameBufferTex[FRAMEBUFFER_RT_DEPTH]);
 				m_uniforms.submit();
 				screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
 				bgfx::submit(view, m_linearDepthProgram);
 				++view;
 			}
 
-			// Shade gbuffer
-			{
-				bgfx::setViewName(view, "combine");
-				bgfx::setViewRect(view, 0, 0, uint16_t(m_width), uint16_t(m_height));
-				bgfx::setViewTransform(view, NULL, orthoProj);
-				bgfx::setViewFrameBuffer(view, m_currentColor.m_buffer);
-				bgfx::setState(0
-					| BGFX_STATE_WRITE_RGB
-					| BGFX_STATE_WRITE_A
-					| BGFX_STATE_DEPTH_TEST_ALWAYS
-					);
-				bgfx::setTexture(0, s_color, m_gbufferTex[GBUFFER_RT_COLOR]);
-				bgfx::setTexture(1, s_normal, m_gbufferTex[GBUFFER_RT_NORMAL]);
-				bgfx::setTexture(2, s_depth, m_linearDepth.m_texture);
-				m_uniforms.submit();
-				screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
-				bgfx::submit(view, m_combineProgram);
-				++view;
-			}
-
 			// update last texture written, to chain passes together
-			bgfx::TextureHandle lastTex = m_currentColor.m_texture;
+			bgfx::TextureHandle lastTex = m_frameBufferTex[FRAMEBUFFER_RT_COLOR];
 
-			
 			// Copy color result to swap chain
 			{
 				bgfx::setViewName(view, "display");
@@ -609,7 +582,6 @@ public:
 				, model.position[2]
 				);
 
-			// Submit mesh to gbuffer
 			bgfx::setTexture(0, s_albedo, m_groundTexture);
 			bgfx::setTexture(1, s_normal, m_normalTexture);
 			_uniforms.submit();
@@ -739,10 +711,9 @@ public:
 			| BGFX_SAMPLER_MIP_POINT
 			;
 
-		m_gbufferTex[GBUFFER_RT_COLOR]    = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, pointSampleFlags);
-		m_gbufferTex[GBUFFER_RT_NORMAL]   = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, pointSampleFlags);
-		m_gbufferTex[GBUFFER_RT_DEPTH]    = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, pointSampleFlags);
-		m_gbuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_gbufferTex), m_gbufferTex, true);
+		m_frameBufferTex[FRAMEBUFFER_RT_COLOR]    = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, pointSampleFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH]    = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, pointSampleFlags);
+		m_frameBuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_frameBufferTex), m_frameBufferTex, true);
 
 		m_currentColor.init(m_size[0], m_size[1], bgfx::TextureFormat::RG11B10F, bilinearFlags);
 		m_temporaryColor.init(m_size[0], m_size[1], bgfx::TextureFormat::RG11B10F, bilinearFlags);
@@ -757,7 +728,7 @@ public:
 	// all buffers set to destroy their textures
 	void destroyFramebuffers()
 	{
-		bgfx::destroy(m_gbuffer);
+		bgfx::destroy(m_frameBuffer);
 
 		m_currentColor.destroy();
 		m_temporaryColor.destroy();
@@ -833,8 +804,7 @@ public:
 	entry::MouseState m_mouseState;
 
 	// Resource handles
-	bgfx::ProgramHandle m_gbufferProgram;
-	bgfx::ProgramHandle m_combineProgram;
+	bgfx::ProgramHandle m_forwardProgram;
 	bgfx::ProgramHandle m_copyProgram;
 	bgfx::ProgramHandle m_linearDepthProgram;
 	bgfx::ProgramHandle m_dofSinglePassProgram;
@@ -852,8 +822,8 @@ public:
 	bgfx::UniformHandle s_depth;
 	bgfx::UniformHandle s_blurredColor;
 
-	bgfx::FrameBufferHandle m_gbuffer;
-	bgfx::TextureHandle m_gbufferTex[GBUFFER_RENDER_TARGETS];
+	bgfx::FrameBufferHandle m_frameBuffer;
+	bgfx::TextureHandle m_frameBufferTex[FRAMEBUFFER_RENDER_TARGETS];
 
 	RenderTarget m_currentColor;
 	RenderTarget m_temporaryColor; // need another buffer to ping-pong results
