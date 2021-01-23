@@ -4,7 +4,7 @@
 */
 
 /*
-
+* ...
 */
 
 
@@ -22,12 +22,21 @@ namespace {
 #define FRAMEBUFFER_RT_DEPTH		1
 #define FRAMEBUFFER_RENDER_TARGETS	2
 
-#define MODEL_COUNT				100
+#define MODEL_COUNT					100
+
+enum Meshes
+{
+	MeshSphere = 0,
+	MeshCube,
+	MeshTree,
+	MeshHollowCube,
+	MeshBunny
+};
 
 static const char * s_meshPaths[] =
 {
 	"meshes/unit_sphere.bin",
-	"meshes/column.bin",
+	"meshes/cube.bin",
 	"meshes/tree.bin",
 	"meshes/hollowcube.bin",
 	"meshes/bunny.bin"
@@ -269,9 +278,6 @@ public:
 			model.position[2] = (((mwc.gen() % 256)) - 128.0f) / 20.0f;
 		}
 
-		// Load ground, just use the cube
-		m_ground = meshLoad("meshes/cube.bin");
-
 		m_groundTexture = loadTexture("textures/fieldstone-rgba.dds");
 		m_normalTexture = loadTexture("textures/fieldstone-n.dds");
 
@@ -304,7 +310,6 @@ public:
 		{
 			meshUnload(m_meshes[ii]);
 		}
-		meshUnload(m_ground);
 
 		bgfx::destroy(m_normalTexture);
 		bgfx::destroy(m_groundTexture);
@@ -433,38 +438,38 @@ public:
 			// update last texture written, to chain passes together
 			bgfx::TextureHandle lastTex = m_frameBufferTex[FRAMEBUFFER_RT_COLOR];
 
-			// Copy color result to swap chain
-			{
-				bgfx::setViewName(view, "display");
-				bgfx::setViewClear(view
-					, BGFX_CLEAR_NONE
-					, 0
-					, 1.0f
-					, 0
-				);
+			//// Copy color result to swap chain
+			//{
+			//	bgfx::setViewName(view, "display");
+			//	bgfx::setViewClear(view
+			//		, BGFX_CLEAR_NONE
+			//		, 0
+			//		, 1.0f
+			//		, 0
+			//	);
 
-				bgfx::setViewRect(view, 0, 0, uint16_t(m_width), uint16_t(m_height));
-				bgfx::setViewTransform(view, NULL, orthoProj);
+			//	bgfx::setViewRect(view, 0, 0, uint16_t(m_width), uint16_t(m_height));
+			//	bgfx::setViewTransform(view, NULL, orthoProj);
 
-				if (m_useBokehDof)
-				{
-					bgfx::setViewFrameBuffer(view, m_temporaryColor.m_buffer);
-				}
-				else
-				{
-					bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
-				}
+			//	if (m_useBokehDof)
+			//	{
+			//		bgfx::setViewFrameBuffer(view, m_temporaryColor.m_buffer);
+			//	}
+			//	else
+			//	{
+			//		bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
+			//	}
 
-				bgfx::setState(0
-					| BGFX_STATE_WRITE_RGB
-					| BGFX_STATE_WRITE_A
-					);
-				bgfx::setTexture(0, s_color, lastTex);
-				screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
-				bgfx::submit(view, m_copyProgram);
-				++view;
-				lastTex = m_temporaryColor.m_texture;
-			}
+			//	bgfx::setState(0
+			//		| BGFX_STATE_WRITE_RGB
+			//		| BGFX_STATE_WRITE_A
+			//		);
+			//	bgfx::setTexture(0, s_color, lastTex);
+			//	screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
+			//	bgfx::submit(view, m_copyProgram);
+			//	++view;
+			//	lastTex = m_temporaryColor.m_texture;
+			//}
 
 			// optionally, apply dof
 			if (m_useBokehDof)
@@ -607,7 +612,7 @@ public:
 		bgfx::setTexture(1, s_normal, m_normalTexture);
 		_uniforms.submit();
 
-		meshSubmit(m_ground, _pass, _program, mtx);
+		meshSubmit(m_meshes[MeshCube], _pass, _program, mtx);
 	}
 
 	bgfx::ViewId drawDepthOfField(bgfx::ViewId _pass, bgfx::TextureHandle _colorTexture, float* _orthoProj, bool _originBottomLeft)
@@ -776,10 +781,8 @@ public:
 		m_uniforms.m_frameIdx = float(m_currFrame % 8);
 
 		{
-			float lightPosition[] = { -10.0f, 10.0f, -10.0f, 1.0f };
-			float viewSpaceLightPosition[4];
-			bx::vec4MulMtx(viewSpaceLightPosition, lightPosition, m_view);
-			bx::memCopy(m_uniforms.m_lightPosition, viewSpaceLightPosition, 3*sizeof(float));
+			float lightPosition[] = { -10.0f, 10.0f, -10.0f };
+			bx::memCopy(m_uniforms.m_lightPosition, lightPosition, 3*sizeof(float));
 		}
 
 		// bokeh depth of field
@@ -839,7 +842,6 @@ public:
 
 	Model m_models[MODEL_COUNT];
 	Mesh* m_meshes[BX_COUNTOF(s_meshPaths)];
-	Mesh* m_ground;
 	bgfx::TextureHandle m_groundTexture;
 	bgfx::TextureHandle m_normalTexture;
 
