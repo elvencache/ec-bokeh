@@ -47,20 +47,12 @@ void main()
 	normalMap.z = sqrt(1.0 - dot(normalMap.xy, normalMap.xy));
 	
 	// swap x and y, because the brick texture looks flipped, don't copy this...
-	normalMap.xy = normalMap.yx;
+	normalMap.xy = -normalMap.yx;
 
 	// perturb geometry normal by normal map
 	vec3 pos = v_texcoord1.xyz; // contains world space pos
 	mat3 TBN = cotangentFrame(normal, pos, v_texcoord0);
 	vec3 bumpedNormal = normalize(instMul(TBN, normalMap));
-
-	// need some proxy for roughness value w/o roughness texture
-	// assume horizontal (blue) normal map is smooth, and then
-	// modulate with albedo for some higher frequency detail
-	float roughness = normalMap.z * mix(0.9, 1.0, albedo.y);
-	roughness = roughness * 0.6 + 0.2;
-	float gloss = 1.0-roughness;
-	float specPower = 1022.0 * gloss + 2.0;
 
 	vec3 light = (u_lightPosition - pos);
 	light = normalize(light);
@@ -71,10 +63,12 @@ void main()
 	vec3 V = v_texcoord2.xyz; // contains view vector
 	vec3 H = normalize(V+light);
 	float NdotH = saturate(dot(bumpedNormal, H));
-	float specular = 5.0 * pow(NdotH, specPower);
+	float specular = 5.0 * pow(NdotH, 256);
+	float ambient = 0.1;
 
-	float lightAmount = mix(diffuse, specular, 0.04);
-	vec3 color = u_color * albedo * lightAmount;
+	float lightAmount = ambient + diffuse;
+	vec3 color = u_color * albedo * lightAmount + specular;
+	color = color/(color+1.0);
 	color = toGamma(color);
 
 	gl_FragColor = vec4(color, 1.0);

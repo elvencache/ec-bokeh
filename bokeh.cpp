@@ -22,8 +22,6 @@ namespace {
 #define FRAMEBUFFER_RT_DEPTH		1
 #define FRAMEBUFFER_RENDER_TARGETS	2
 
-#define MODEL_COUNT					100
-
 enum Meshes
 {
 	MeshCube = 0,
@@ -42,9 +40,9 @@ static const char * s_meshPaths[] =
 
 static const float s_meshScale[] =
 {
+	0.45f,
 	0.25f,
-	0.25f,
-	0.25f,
+	0.30f,
 	0.25f
 };
 
@@ -283,18 +281,6 @@ public:
 			m_meshes[ii] = meshLoad(s_meshPaths[ii]);
 		}
 
-		// Randomly create some models
-		bx::RngMwc mwc;
-		for (uint32_t ii = 0; ii < BX_COUNTOF(m_models); ++ii)
-		{
-			Model& model = m_models[ii];
-
-			model.mesh = mwc.gen() % BX_COUNTOF(s_meshPaths);
-			model.position[0] = (((mwc.gen() % 256)) - 128.0f) / 20.0f;
-			model.position[1] = 0;
-			model.position[2] = (((mwc.gen() % 256)) - 128.0f) / 20.0f;
-		}
-
 		m_groundTexture = loadTexture("textures/fieldstone-rgba.dds");
 		m_normalTexture = loadTexture("textures/fieldstone-n.dds");
 
@@ -306,7 +292,7 @@ public:
 
 		// Init camera
 		cameraCreate();
-		cameraSetPosition({ 0.0f, 1.5f, -4.0f });
+		cameraSetPosition({ 0.0f, 2.5f, -8.0f });
 		cameraSetVerticalAngle(-0.3f);
 		m_fovY = 60.0f;
 
@@ -387,6 +373,14 @@ public:
 				m_recreateFrameBuffers = false;
 			}
 
+			// update animation time
+			const float rotationSpeed = 0.75f;
+			m_animationTime += deltaTime * rotationSpeed;
+			if (bx::kPi2 < m_animationTime)
+			{
+				m_animationTime -= bx::kPi2;
+			}
+
 			// Update camera
 			cameraUpdate(deltaTime*0.15f, m_mouseState);
 
@@ -405,7 +399,7 @@ public:
 				bgfx::setViewName(view, "forward scene");
 				bgfx::setViewClear(view
 					, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH
-					, 0
+					, 0xbbddffff // clear to a sky blue
 					, 1.0f
 					, 0
 				);
@@ -550,54 +544,43 @@ public:
 
 	void drawAllModels(bgfx::ViewId _pass, bgfx::ProgramHandle _program, ModelUniforms & _uniforms)
 	{
-		for (uint32_t ii = 0; ii < BX_COUNTOF(m_models); ++ii)
+		const int32_t width = 6;
+		const int32_t length = 20;
+		for (int32_t zz = 0; zz < length; ++zz)
 		{
-			const Model& model = m_models[ii];
+			for (int32_t xx = 0; xx < width; ++xx)
+			{
+				const float singleIdx = float(zz * width + xx);
+				const float angle = m_animationTime + float(zz)*(bx::kPi2/length) + float(xx)*(bx::kPiHalf/width);
 
-			// Set up transform matrix for each model
-			const float scale = s_meshScale[model.mesh];
-			float mtx[16];
-			bx::mtxSRT(mtx
-				, scale
-				, scale
-				, scale
-				, 0.0f
-				, 0.0f
-				, 0.0f
-				, model.position[0]
-				, model.position[1]
-				, model.position[2]
-				);
+				const float posX = 2.0f * xx - width + 1.0f;
+				const float posY = bx::sin(angle);
+				const float posZ = 2.0f * zz - length + 1.0f;
 
-			bgfx::setTexture(0, s_albedo, m_groundTexture);
-			bgfx::setTexture(1, s_normal, m_normalTexture);
-			_uniforms.m_color[0] = bx::fract(float(ii)/10.0f) * 0.6f + 0.2f;
-			_uniforms.m_color[1] = bx::fract(float(ii)/25.0f) * 0.6f + 0.2f;
-			_uniforms.m_color[2] = bx::fract(float(ii)/50.0f) * 0.6f + 0.2f;
-			_uniforms.submit();
+				const float scale = s_meshScale[MeshHollowCube];
+				float mtx[16];
+				bx::mtxSRT(mtx
+					, scale
+					, scale
+					, scale
+					, 0.0f
+					, 0.0f
+					, 0.0f
+					, posX
+					, posY
+					, posZ
+					);
 
-			meshSubmit(m_meshes[model.mesh], _pass, _program, mtx);
+				bgfx::setTexture(0, s_albedo, m_groundTexture);
+				bgfx::setTexture(1, s_normal, m_normalTexture);
+				_uniforms.m_color[0] = bx::fract(singleIdx/10.0f) * 0.6f + 0.2f;
+				_uniforms.m_color[1] = bx::fract(singleIdx/25.0f) * 0.6f + 0.2f;
+				_uniforms.m_color[2] = bx::fract(singleIdx/50.0f) * 0.6f + 0.2f;
+				_uniforms.submit();
+
+				meshSubmit(m_meshes[MeshHollowCube], _pass, _program, mtx);
+			}
 		}
-
-		// Draw ground
-		float mtxScale[16];
-		const float scale = 10.0f;
-		bx::mtxScale(mtxScale, scale, scale, scale);
-
-		float mtxTranslate[16];
-		bx::mtxTranslate(mtxTranslate
-			, 0.0f
-			, -10.0f
-			, 0.0f
-			);
-
-		float mtx[16];
-		bx::mtxMul(mtx, mtxScale, mtxTranslate);
-		bgfx::setTexture(0, s_albedo, m_groundTexture);
-		bgfx::setTexture(1, s_normal, m_normalTexture);
-		_uniforms.submit();
-
-		meshSubmit(m_meshes[MeshCube], _pass, _program, mtx);
 	}
 
 	bgfx::ViewId drawDepthOfField(bgfx::ViewId _pass, bgfx::TextureHandle _colorTexture, float* _orthoProj, bool _originBottomLeft)
@@ -759,7 +742,7 @@ public:
 		m_uniforms.m_frameIdx = float(m_currFrame % 8);
 
 		{
-			float lightPosition[] = { -10.0f, 10.0f, -10.0f };
+			float lightPosition[] = { 0.0f, 6.0f, 10.0f };
 			bx::memCopy(m_modelUniforms.m_lightPosition, lightPosition, 3*sizeof(float));
 		}
 
@@ -817,7 +800,6 @@ public:
 		float position[3];
 	};
 
-	Model m_models[MODEL_COUNT];
 	Mesh* m_meshes[BX_COUNTOF(s_meshPaths)];
 	bgfx::TextureHandle m_groundTexture;
 	bgfx::TextureHandle m_normalTexture;
@@ -827,6 +809,7 @@ public:
 	float m_texelHalf = 0.0f;
 	float m_fovY = 60.0f;
 	bool m_recreateFrameBuffers = false;
+	float m_animationTime = 0.0f;
 
 	float m_view[16];
 	float m_proj[16];
