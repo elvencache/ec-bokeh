@@ -68,7 +68,6 @@ void main()
 
 	float lightAmount = ambient + diffuse;
 	vec3 color = u_color * albedo * lightAmount + specular;
-	color = color/(color+1.0);
 	color = toGamma(color);
 
 	gl_FragColor = vec4(color, 1.0);

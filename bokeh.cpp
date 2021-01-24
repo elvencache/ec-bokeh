@@ -508,7 +508,7 @@ public:
 				ImGui::Checkbox("use single pass", &m_useSinglePassBokehDof);
 				ImGui::SliderFloat("max blur size", &m_maxBlurSize, 10.0f, 50.0f);
 				ImGui::SliderFloat("focusPoint", &m_focusPoint, 1.0f, 20.0f);
-				ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 2.0f);
+				ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 10.0f);
 				ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
 
 				// having a difficult time reasoning about how many steps are taken when increasing
@@ -678,17 +678,11 @@ public:
 			| BGFX_SAMPLER_V_CLAMP
 			;
 
-		const uint64_t pointSampleFlags = bilinearFlags
-			| BGFX_SAMPLER_MIN_POINT
-			| BGFX_SAMPLER_MAG_POINT
-			| BGFX_SAMPLER_MIP_POINT
-			;
-
-		m_frameBufferTex[FRAMEBUFFER_RT_COLOR] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, pointSampleFlags);
-		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, pointSampleFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_COLOR] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, bilinearFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, bilinearFlags);
 		m_frameBuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_frameBufferTex), m_frameBufferTex, true);
 
-		m_linearDepth.init(m_size[0], m_size[1], bgfx::TextureFormat::R16F, pointSampleFlags);
+		m_linearDepth.init(m_size[0], m_size[1], bgfx::TextureFormat::R16F, bilinearFlags);
 
 		unsigned halfWidth = m_size[0]/2;
 		unsigned halfHeight = m_size[1]/2;
@@ -820,7 +814,7 @@ public:
 	bool m_useBokehDof = true;
 	bool m_useSinglePassBokehDof = true;
 	float m_maxBlurSize = 20.0f;
-	float m_focusPoint = 1.0f;
+	float m_focusPoint = 7.0f;
 	float m_focusScale = 2.0f;
 	float m_radiusScale = 3.856f;//0.5f;
 	float m_blurSteps = 50.0f;
