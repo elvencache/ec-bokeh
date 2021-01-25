@@ -15,12 +15,16 @@ float ShadertoyNoise (vec2 uv) {
 	return fract(sin(dot(uv.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
-float GetBlurSize (float depth, float focusPoint, float focusScale)
+float GetCircleOfConfusion (float depth, float focusPoint, float focusScale)
 {
 	// if depth is less than focusPoint, result will be negative. want to keep this
 	// relationship so comparison of (signed) blur size is same as comparing depth.
+	return clamp((1.0/focusPoint - 1.0/depth) * focusScale, -1.0, 1.0);
+}
 
-	float circleOfConfusion = clamp((1.0/focusPoint - 1.0/depth) * focusScale, -1.0, 1.0);
+float GetBlurSize (float depth, float focusPoint, float focusScale)
+{
+	float circleOfConfusion = GetCircleOfConfusion(depth, focusPoint, focusScale);
 	return circleOfConfusion * u_maxBlurSize;
 }
 

@@ -274,6 +274,7 @@ public:
 		m_dofDownsampleProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_downsample");
 		m_dofQuarterProgram			= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_second_pass");
 		m_dofCombineProgram			= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_combine");
+		m_dofDebugProgram			= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_debug");
 
 		// Load some meshes
 		for (uint32_t ii = 0; ii < BX_COUNTOF(s_meshPaths); ++ii)
@@ -292,7 +293,7 @@ public:
 
 		// Init camera
 		cameraCreate();
-		cameraSetPosition({ 0.0f, 2.5f, -8.0f });
+		cameraSetPosition({ 0.0f, 2.5f, -20.0f });
 		cameraSetVerticalAngle(-0.3f);
 		m_fovY = 60.0f;
 
@@ -324,6 +325,7 @@ public:
 		bgfx::destroy(m_dofDownsampleProgram);
 		bgfx::destroy(m_dofQuarterProgram);
 		bgfx::destroy(m_dofCombineProgram);
+		bgfx::destroy(m_dofDebugProgram);
 
 		m_uniforms.destroy();
 		m_modelUniforms.destroy();
@@ -506,6 +508,7 @@ public:
 			{
 				ImGui::Checkbox("use bokeh dof", &m_useBokehDof);
 				ImGui::Checkbox("use single pass", &m_useSinglePassBokehDof);
+				ImGui::Checkbox("show debug vis", &m_showDebugVisualization);
 				ImGui::SliderFloat("max blur size", &m_maxBlurSize, 10.0f, 50.0f);
 				ImGui::SliderFloat("focusPoint", &m_focusPoint, 1.0f, 20.0f);
 				ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 10.0f);
@@ -546,11 +549,31 @@ public:
 	{
 		const int32_t width = 6;
 		const int32_t length = 20;
+
+		float c0[] = {  72.0f/255.0f, 126.0f/255.0f, 149.0f/255.0f }; // blue
+		float c1[] = { 235.0f/255.0f, 146.0f/255.0f, 251.0f/255.0f }; // purple
+		float c2[] = { 199.0f/255.0f,   0.0f/255.0f,  57.0f/255.0f }; // pink
+
 		for (int32_t zz = 0; zz < length; ++zz)
 		{
+			// make a color gradient, nothing special about this for example
+			float * ca = c0;
+			float * cb = c1;
+			float lerpVal = float(zz) / float(length);
+
+			if (0.5f <= lerpVal)
+			{
+				ca = c1;
+				cb = c2;
+			}
+			lerpVal = bx::fract(2.0f*lerpVal);
+
+			float r = bx::lerp(ca[0], cb[0], lerpVal);
+			float g = bx::lerp(ca[1], cb[1], lerpVal);
+			float b = bx::lerp(ca[2], cb[2], lerpVal);
+
 			for (int32_t xx = 0; xx < width; ++xx)
 			{
-				const float singleIdx = float(zz * width + xx);
 				const float angle = m_animationTime + float(zz)*(bx::kPi2/length) + float(xx)*(bx::kPiHalf/width);
 
 				const float posX = 2.0f * xx - width + 1.0f;
@@ -573,9 +596,9 @@ public:
 
 				bgfx::setTexture(0, s_albedo, m_groundTexture);
 				bgfx::setTexture(1, s_normal, m_normalTexture);
-				_uniforms.m_color[0] = bx::fract(singleIdx/10.0f) * 0.6f + 0.2f;
-				_uniforms.m_color[1] = bx::fract(singleIdx/25.0f) * 0.6f + 0.2f;
-				_uniforms.m_color[2] = bx::fract(singleIdx/50.0f) * 0.6f + 0.2f;
+				_uniforms.m_color[0] = r;
+				_uniforms.m_color[1] = g;
+				_uniforms.m_color[2] = b;
 				_uniforms.submit();
 
 				meshSubmit(m_meshes[MeshHollowCube], _pass, _program, mtx);
@@ -588,7 +611,25 @@ public:
 		bgfx::ViewId view = _pass;
 		bgfx::TextureHandle lastTex = _colorTexture;
 
-		if (m_useSinglePassBokehDof)
+		if (m_showDebugVisualization)
+		{
+			bgfx::setViewName(view, "bokeh dof debug pass");
+			bgfx::setViewRect(view, 0, 0, uint16_t(m_width), uint16_t(m_height));
+			bgfx::setViewTransform(view, NULL, _orthoProj);
+			bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
+			bgfx::setState(0
+				| BGFX_STATE_WRITE_RGB
+				| BGFX_STATE_WRITE_A
+				| BGFX_STATE_DEPTH_TEST_ALWAYS
+				);
+			bgfx::setTexture(0, s_color, lastTex);
+			bgfx::setTexture(1, s_depth, m_linearDepth.m_texture);
+			m_uniforms.submit();
+			screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, _originBottomLeft);
+			bgfx::submit(view, m_dofDebugProgram);
+			++view;
+		}
+		else if (m_useSinglePassBokehDof)
 		{
 			bgfx::setViewName(view, "bokeh dof single pass");
 			bgfx::setViewRect(view, 0, 0, uint16_t(m_width), uint16_t(m_height));
@@ -601,6 +642,7 @@ public:
 				);
 			bgfx::setTexture(0, s_color, lastTex);
 			bgfx::setTexture(1, s_depth, m_linearDepth.m_texture);
+			m_uniforms.submit();
 			screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, _originBottomLeft);
 			bgfx::submit(view, m_dofSinglePassProgram);
 			++view;
@@ -621,6 +663,7 @@ public:
 				);
 			bgfx::setTexture(0, s_color, lastTex);
 			bgfx::setTexture(1, s_depth, m_linearDepth.m_texture);
+			m_uniforms.submit();
 			screenSpaceQuad(float(halfWidth), float(halfHeight), m_texelHalf, _originBottomLeft);
 			bgfx::submit(view, m_dofDownsampleProgram);
 			++view;
@@ -643,6 +686,7 @@ public:
 				| BGFX_STATE_DEPTH_TEST_ALWAYS
 				);
 			bgfx::setTexture(0, s_color, lastTex);
+			m_uniforms.submit();
 			screenSpaceQuad(float(halfWidth), float(halfHeight), m_texelHalf, _originBottomLeft);
 			bgfx::submit(view, m_dofQuarterProgram);
 			++view;
@@ -659,6 +703,7 @@ public:
 				);
 			bgfx::setTexture(0, s_color, _colorTexture);
 			bgfx::setTexture(1, s_blurredColor, lastTex);
+			m_uniforms.submit();
 			screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, _originBottomLeft);
 			bgfx::submit(view, m_dofCombineProgram);
 			++view;
@@ -769,6 +814,7 @@ public:
 	bgfx::ProgramHandle m_dofDownsampleProgram;
 	bgfx::ProgramHandle m_dofQuarterProgram;
 	bgfx::ProgramHandle m_dofCombineProgram;
+	bgfx::ProgramHandle m_dofDebugProgram;
 
 	// Shader uniforms
 	PassUniforms m_uniforms;
@@ -814,11 +860,12 @@ public:
 	bool m_useBokehDof = true;
 	bool m_useSinglePassBokehDof = true;
 	float m_maxBlurSize = 20.0f;
-	float m_focusPoint = 7.0f;
-	float m_focusScale = 2.0f;
+	float m_focusPoint = 5.0f;
+	float m_focusScale = 3.0f;
 	float m_radiusScale = 3.856f;//0.5f;
 	float m_blurSteps = 50.0f;
 	bool m_useSqrtDistribution = false;
+	bool m_showDebugVisualization = false;
 };
 
 } // namespace
