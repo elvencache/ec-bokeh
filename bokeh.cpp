@@ -507,12 +507,38 @@ public:
 
 			{
 				ImGui::Checkbox("use bokeh dof", &m_useBokehDof);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("turn effect on and off");
+
 				ImGui::Checkbox("use single pass", &m_useSinglePassBokehDof);
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::BeginTooltip();
+					ImGui::Text("calculate in a single pass at full resolution or use");
+					ImGui::Text("multiple passes to compute at lower res and composite");
+					ImGui::EndTooltip();
+				}
+
 				ImGui::Checkbox("show debug vis", &m_showDebugVisualization);
-				ImGui::SliderFloat("max blur size", &m_maxBlurSize, 10.0f, 50.0f);
-				ImGui::SliderFloat("focusPoint", &m_focusPoint, 1.0f, 20.0f);
-				ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 10.0f);
-				ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::BeginTooltip();
+					ImGui::Text("apply coloration to screen. fades from grey to orange with");
+					ImGui::Text("increasing foreground blur. from grey to blue in background");
+					ImGui::EndTooltip();
+				}
+				ImGui::Separator();
+
+				{
+					ImGui::Text("blur controls:");
+					ImGui::SliderFloat("max blur size", &m_maxBlurSize, 10.0f, 50.0f);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("maximum blur size in screen pixels");
+
+					ImGui::SliderFloat("focusPoint", &m_focusPoint, 1.0f, 20.0f);
+					ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 10.0f);
+					ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
+				}
 
 				// having a difficult time reasoning about how many steps are taken when increasing
 				// radius by (scale/radius) so calculate value instead. general pattern, take smaller
