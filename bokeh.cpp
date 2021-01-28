@@ -529,17 +529,25 @@ public:
 				}
 				ImGui::Separator();
 
-				{
-					ImGui::Text("blur controls:");
-					ImGui::SliderFloat("max blur size", &m_maxBlurSize, 10.0f, 50.0f);
-					if (ImGui::IsItemHovered())
-						ImGui::SetTooltip("maximum blur size in screen pixels");
+				ImGui::Text("blur controls:");
+				ImGui::SliderFloat("max blur size", &m_maxBlurSize, 10.0f, 50.0f);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("maximum blur size in screen pixels");
 
-					ImGui::SliderFloat("focusPoint", &m_focusPoint, 1.0f, 20.0f);
-					ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 10.0f);
-					ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
-				}
+				ImGui::SliderFloat("focusPoint", &m_focusPoint, 1.0f, 20.0f);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("distance to focus plane");
 
+				ImGui::SliderFloat("focusScale", &m_focusScale, 0.0f, 10.0f);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("multiply focus calculation, larger=tighter focus");
+				ImGui::Separator();
+
+				
+				ImGui::Text("sample pattern controls:");
+
+				ImGui::Text("original sample's distribution:");
+				ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
 				// having a difficult time reasoning about how many steps are taken when increasing
 				// radius by (scale/radius) so calculate value instead. general pattern, take smaller
 				// steps further from center. maybe use different formula that directly sets steps?
@@ -551,10 +559,20 @@ public:
 					++counter;
 					radius += m_radiusScale / radius;
 				}
+				ImGui::TextWrapped(
+					"having a difficult time reasoning about how many samples are taken when "
+					"increasing radius by (scale/radius) so calculate value instead. pattern "
+					"is kinda to take smaller steps further from center. display count below:");
 				ImGui::SliderInt("steps debug:", &counter, 0, counter);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("number of sample taps as determined by radiusScale");
 
+				ImGui::TextWrapped(
+					"that sure seems like a lot of samples! what about a different pattern?"
+				);
 				ImGui::Checkbox("use sqrt distribution", &m_useSqrtDistribution);
 				ImGui::SliderFloat("blur steps", &m_blurSteps, 10.f, 100.0f);
+
 			}
 
 			ImGui::End();
