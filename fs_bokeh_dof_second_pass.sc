@@ -17,8 +17,7 @@ void main()
 {
 	vec2 texCoord = v_texcoord0.xy;
 
-	bool useSqrtDistribution = (0.0 < u_useSqrtDistribution);
-	vec4 output = DepthOfField(s_color, s_color, texCoord, u_focusPoint, u_focusScale, useSqrtDistribution);
+	vec4 output = DepthOfField(s_color, s_color, texCoord, u_focusPoint, u_focusScale, u_samplePattern);
 
 	gl_FragColor = output;
 }

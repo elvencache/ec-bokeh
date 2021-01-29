@@ -91,7 +91,7 @@ struct PassUniforms
 		{
 			/* 0    */ struct { float m_depthUnpackConsts[2]; float m_frameIdx; float m_unused0; };
 			/* 1    */ struct { float m_ndcToViewMul[2]; float m_ndcToViewAdd[2]; };
-			/* 2    */ struct { float m_blurSteps; float m_useSqrtDistribution; float m_unused3[2]; };
+			/* 2    */ struct { float m_blurSteps; float m_samplePattern; float m_unused3[2]; };
 			/* 3    */ struct { float m_maxBlurSize; float m_focusPoint; float m_focusScale; float m_radiusScale; };
 		};
 
@@ -149,11 +149,6 @@ struct RenderTarget
 	bgfx::TextureHandle m_texture;
 	bgfx::FrameBufferHandle m_buffer;
 };
-
-static float floatFromBool(bool val)
-{
-	return (val) ? 1.0f : 0.0f;
-}
 
 void screenSpaceQuad(float _textureWidth, float _textureHeight, float _texelHalf, bool _originBottomLeft, float _width = 1.0f, float _height = 1.0f)
 {
@@ -545,6 +540,16 @@ public:
 
 				
 				ImGui::Text("sample pattern controls:");
+				ImGui::Combo("pattern", &m_samplePattern, "original\0sqrt\0\0");
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::BeginTooltip();
+					ImGui::Text("original");
+					ImGui::BulletText("pattern descibed by original blogpost");
+					ImGui::Text("sqrt");
+					ImGui::BulletText("use sqrt instead of linear steps");
+					ImGui::EndTooltip();
+				}
 
 				ImGui::Text("original sample's distribution:");
 				ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
@@ -570,7 +575,6 @@ public:
 				ImGui::TextWrapped(
 					"that sure seems like a lot of samples! what about a different pattern?"
 				);
-				ImGui::Checkbox("use sqrt distribution", &m_useSqrtDistribution);
 				ImGui::SliderFloat("blur steps", &m_blurSteps, 10.f, 100.0f);
 
 			}
@@ -834,7 +838,7 @@ public:
 			// reduce dimensions by half to go along with smaller render target
 			const float blurScale = (m_useSinglePassBokehDof) ? 1.0f : 0.5f;
 			m_uniforms.m_blurSteps = m_blurSteps;
-			m_uniforms.m_useSqrtDistribution = floatFromBool(m_useSqrtDistribution);
+			m_uniforms.m_samplePattern = float(m_samplePattern);
 			m_uniforms.m_maxBlurSize = m_maxBlurSize * blurScale;
 			m_uniforms.m_focusPoint = m_focusPoint;
 			m_uniforms.m_focusScale = m_focusScale;
@@ -908,7 +912,7 @@ public:
 	float m_focusScale = 3.0f;
 	float m_radiusScale = 3.856f;//0.5f;
 	float m_blurSteps = 50.0f;
-	bool m_useSqrtDistribution = false;
+	int32_t m_samplePattern = 0;
 	bool m_showDebugVisualization = false;
 };
 

@@ -89,7 +89,7 @@ vec4 DepthOfField(
 	vec2 texCoord,
 	float focusPoint,
 	float focusScale,
-	bool useSqrtDistribution
+	float samplePattern
 ) {
 	vec3 color;
 	float centerSize;
@@ -116,7 +116,7 @@ vec4 DepthOfField(
 	// support two options for sample distribution ===========================
 	float loopValue;
 	float loopEnd;
-	if (useSqrtDistribution)
+	if (0.5 < samplePattern)
 	{
 		// in sqrt distribution, take fixed number of steps, step count
 		// is fraction of full radius, with curve adjusted by sqrt function
@@ -136,7 +136,7 @@ vec4 DepthOfField(
 	{
 		//====================================================================
 		float radius;
-		if (useSqrtDistribution) {
+		if (0.5 < samplePattern) {
 			radius = sqrt(loopValue) * u_maxBlurSize;
 		}
 		else
@@ -171,7 +171,7 @@ vec4 DepthOfField(
 		theta += thetaStep;
 
 		//====================================================================
-		if (useSqrtDistribution)
+		if (0.5 < samplePattern)
 		{
 			loopValue += (1.0 / u_blurSteps); // radiusFraction
 		}
