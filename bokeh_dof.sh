@@ -58,8 +58,8 @@ float GetBlurSize (float depth, float focusPoint, float focusScale)
 
 
 void GetColorAndBlurSize (
-	BgfxSampler2D samplerColor,
-	BgfxSampler2D samplerDepth,
+	sampler2D samplerColor,
+	sampler2D samplerDepth,
 	vec2 texCoord,
 	float focusPoint,
 	float focusScale,
@@ -67,15 +67,15 @@ void GetColorAndBlurSize (
 	out float outBlurSize
 ) {
 #if USE_PACKED_COLOR_AND_BLUR
-	vec4 colorAndBlurSize = texture2D(samplerColor, texCoord);
+	vec4 colorAndBlurSize = texture2DLod(samplerColor, texCoord, 0);
 	vec3 color = colorAndBlurSize.xyz;
 	float blurSize = colorAndBlurSize.w;
 
 	outColor = color;
 	outBlurSize = blurSize;
 #else
-	vec3 color = texture2D(samplerColor, texCoord).xyz;
-	float depth = texture2D(samplerDepth, texCoord).x;
+	vec3 color = texture2DLod(samplerColor, texCoord, 0).xyz;
+	float depth = texture2DLod(samplerDepth, texCoord, 0).x;
 	float blurSize = GetBlurSize(depth, focusPoint, focusScale);
 
 	outColor = color;
@@ -84,8 +84,8 @@ void GetColorAndBlurSize (
 }
 
 vec4 DepthOfField(
-	BgfxSampler2D samplerColor,
-	BgfxSampler2D samplerDepth,
+	sampler2D samplerColor,
+	sampler2D samplerDepth,
 	vec2 texCoord,
 	float focusPoint,
 	float focusScale,

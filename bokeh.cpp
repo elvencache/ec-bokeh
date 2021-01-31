@@ -106,7 +106,7 @@ struct ModelUniforms
 	enum { NumVec4 = 2 };
 
 	void init() {
-		u_params = bgfx::createUniform("u_params", bgfx::UniformType::Vec4, NumVec4);
+		u_params = bgfx::createUniform("u_modelParams", bgfx::UniformType::Vec4, NumVec4);
 	};
 
 	void submit() const {
@@ -315,6 +315,7 @@ public:
 		bgfx::destroy(m_groundTexture);
 
 		bgfx::destroy(m_forwardProgram);
+		bgfx::destroy(m_gridProgram);
 		bgfx::destroy(m_copyProgram);
 		bgfx::destroy(m_linearDepthProgram);
 		bgfx::destroy(m_dofSinglePassProgram);
@@ -492,7 +493,7 @@ public:
 				, ImGuiCond_FirstUseEver
 				);
 			ImGui::SetNextWindowSize(
-				ImVec2(m_width / 4.0f, m_height / 1.24f)
+				ImVec2(m_width / 4.0f, m_height / 1.6f)
 				, ImGuiCond_FirstUseEver
 				);
 			ImGui::Begin("Settings"
@@ -507,7 +508,7 @@ public:
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("turn effect on and off");
 
-				ImGui::Checkbox("use single pass", &m_useSinglePassBokehDof);
+				ImGui::Checkbox("use single pass at full res", &m_useSinglePassBokehDof);
 				if (ImGui::IsItemHovered())
 				{
 					ImGui::BeginTooltip();
@@ -547,37 +548,45 @@ public:
 				{
 					ImGui::BeginTooltip();
 					ImGui::Text("original");
-					ImGui::BulletText("pattern descibed by original blogpost");
+					ImGui::BulletText("pattern descibed by blogpost");
 					ImGui::Text("sqrt");
 					ImGui::BulletText("use sqrt instead of linear steps");
 					ImGui::EndTooltip();
 				}
 
-				ImGui::Text("original sample's distribution:");
-				ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
-				// having a difficult time reasoning about how many steps are taken when increasing
-				// radius by (scale/radius) so calculate value instead. general pattern, take smaller
-				// steps further from center. maybe use different formula that directly sets steps?
-				const float maxRadius = m_maxBlurSize;
-				float radius = m_radiusScale;
-				int counter = 0;
-				while (radius < maxRadius)
+				if (0 == m_samplePattern)
 				{
-					++counter;
-					radius += m_radiusScale / radius;
-				}
-				ImGui::TextWrapped(
-					"having a difficult time reasoning about how many samples are taken when "
-					"increasing radius by (scale/radius) so calculate value instead. pattern "
-					"is kinda to take smaller steps further from center. display count below:");
-				ImGui::SliderInt("steps debug:", &counter, 0, counter);
-				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("number of sample taps as determined by radiusScale");
+					ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("controls number of samples taken");
 
-				ImGui::TextWrapped(
-					"that sure seems like a lot of samples! what about a different pattern?"
-				);
-				ImGui::SliderFloat("blur steps", &m_blurSteps, 10.f, 100.0f);
+					ImGui::TextWrapped(
+						"in original blog post, sample code has radius increasing by (radiusScale/currentRadius). "
+						"which should result in smaller steps farther from center. and fewer steps as radiusScale "
+						"increases. but it's less clear exactly how many steps that is, can be many."
+					);
+					const float maxRadius = m_maxBlurSize;
+					float radius = m_radiusScale;
+					int counter = 0;
+					while (radius < maxRadius)
+					{
+						++counter;
+						radius += m_radiusScale / radius;
+					}
+					char buffer[128] = {0};
+					bx::snprintf(buffer, 128-1, "number of samples taken: %d", counter);
+					ImGui::Text(buffer);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("number of sample taps as determined by radiusScale");
+				}
+				else // 1 == samplePattern
+				{
+					ImGui::TextWrapped(
+						"when using sqrt pattern, take a fixed number of steps. sqrt refers to how the radius "
+						"is derived. in both cases, the sample pattern is a spiral out from the center."
+					);
+					ImGui::SliderFloat("blur steps", &m_blurSteps, 10.f, 100.0f);
+				}
 
 			}
 

@@ -3,10 +3,10 @@ $input v_normal, v_texcoord0, v_texcoord1, v_texcoord2
 #include "../common/common.sh"
 
 // struct ModelUniforms
-uniform vec4 u_params[2];
+uniform vec4 u_modelParams[2];
 
-#define u_color				(u_params[0].xyz)
-#define u_lightPosition		(u_params[1].xyz)
+#define u_color				(u_modelParams[0].xyz)
+#define u_lightPosition		(u_modelParams[1].xyz)
 
 
 // http://www.thetenthplanet.de/archives/1180
@@ -30,11 +30,18 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv)
 	return mat3(T*invMax, B*invMax, N);
 }
 
-vec3 GetGridColor (float2 position, float width, vec3 color)
+int ModHelper (float a, float b)
 {
-	vec2 p0 = abs(floor( position + vec2(-width, -width) ));
-	float gc = ((int(p0.x) % 2) == (int(p0.y) % 2)) ? 0.0 : 1.0;
-	return toLinear(color) * mix(0.75, 1.25, gc);
+	return int( a - (b*floor(a/b)));
+}
+
+vec3 GetGridColor (vec2 position, float width, vec3 color)
+{
+	position = abs(floor( position + vec2(-width, -width) ));
+	int posXMod = ModHelper(position.x, 2.0);
+	int posYMod = ModHelper(position.y, 2.0);
+	float gridColorScale = (posXMod == posYMod) ? 0.75 : 1.25;
+	return toLinear(color) * gridColorScale;
 }
 
 void main()

@@ -6,10 +6,10 @@ SAMPLER2D(s_albedo, 0);
 SAMPLER2D(s_normal, 1);
 
 // struct ModelUniforms
-uniform vec4 u_params[2];
+uniform vec4 u_modelParams[2];
 
-#define u_color				(u_params[0].xyz)
-#define u_lightPosition		(u_params[1].xyz)
+#define u_color				(u_modelParams[0].xyz)
+#define u_lightPosition		(u_modelParams[1].xyz)
 
 
 // http://www.thetenthplanet.de/archives/1180
