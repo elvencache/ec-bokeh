@@ -263,6 +263,7 @@ public:
 
 		// Create program from shaders.
 		m_forwardProgram			= loadProgram("vs_bokeh_forward",		"fs_bokeh_forward");
+		m_gridProgram				= loadProgram("vs_bokeh_forward",		"fs_bokeh_forward_grid");
 		m_copyProgram				= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_copy"); 
 		m_linearDepthProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_linear_depth");
 		m_dofSinglePassProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_single_pass");
@@ -445,7 +446,8 @@ public:
 			}
 
 			// optionally, apply dof
-			if (m_useBokehDof)
+			const bool useOrDebugDof = m_useBokehDof || m_showDebugVisualization;
+			if (useOrDebugDof)
 			{
 				view = drawDepthOfField(view, m_frameBufferTex[FRAMEBUFFER_RT_COLOR], orthoProj, caps->originBottomLeft);
 			}
@@ -652,6 +654,31 @@ public:
 				meshSubmit(m_meshes[MeshHollowCube], _pass, _program, mtx);
 			}
 		}
+
+		// draw box as ground plane
+		{
+			const float posY = -2.0f;
+			const float scale = length;
+			float mtx[16];
+			bx::mtxSRT(mtx
+				, scale
+				, scale
+				, scale
+				, 0.0f
+				, 0.0f
+				, 0.0f
+				, 0.0f
+				, -scale + posY
+				, 0.0f
+				);
+
+			_uniforms.m_color[0] = 0.5f;
+			_uniforms.m_color[1] = 0.5f;
+			_uniforms.m_color[2] = 0.5f;
+			_uniforms.submit();
+
+			meshSubmit(m_meshes[MeshCube], _pass, m_gridProgram, mtx);
+		}
 	}
 
 	bgfx::ViewId drawDepthOfField(bgfx::ViewId _pass, bgfx::TextureHandle _colorTexture, float* _orthoProj, bool _originBottomLeft)
@@ -856,6 +883,7 @@ public:
 
 	// Resource handles
 	bgfx::ProgramHandle m_forwardProgram;
+	bgfx::ProgramHandle m_gridProgram;
 	bgfx::ProgramHandle m_copyProgram;
 	bgfx::ProgramHandle m_linearDepthProgram;
 	bgfx::ProgramHandle m_dofSinglePassProgram;
