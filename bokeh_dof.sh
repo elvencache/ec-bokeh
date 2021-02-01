@@ -83,6 +83,27 @@ void GetColorAndBlurSize (
 #endif
 }
 
+float BokehShapeFromAngle (float numBlades, float angle)
+{
+	// sin has one peak, one trough per 2pi period
+	// use squished sine to emulate 'blades' of camera
+	// ex: 6 blades would require six peaks and troughs
+	// could probably come up with better approximation
+	// maybe with triangle?
+
+	float invPeriod = numBlades / (2.0 * 3.1415926);
+	float periodFraction = fract(angle * invPeriod);
+
+	// triangle
+	periodFraction = abs(periodFraction - 0.5);
+
+	// sin
+	//periodFraction = sin(periodFraction * (2.0*3.1415926)) * 0.5;
+
+	//return 0.75 + periodFraction;
+	return 0.8 + (periodFraction * 0.4f);
+}
+
 vec4 DepthOfField(
 	sampler2D samplerColor,
 	sampler2D samplerDepth,
@@ -145,7 +166,8 @@ vec4 DepthOfField(
 		}
 		//====================================================================
 
-		vec2 spiralCoord = texCoord + vec2(cos(theta), sin(theta)) * u_viewTexel.xy * radius;
+		float shapeScale = BokehShapeFromAngle(7.0, theta);
+		vec2 spiralCoord = texCoord + vec2(cos(theta), sin(theta)) * u_viewTexel.xy * (radius * shapeScale);
 
 		vec3 sampleColor;
 		float sampleSize;

@@ -319,6 +319,71 @@ public:
 		const bgfx::RendererType::Enum renderer = bgfx::getRendererType();
 		m_texelHalf = bgfx::RendererType::Direct3D9 == renderer ? 0.5f : 0.0f;
 
+		{
+			const uint32_t bokehSize = 64;
+			
+			const bgfx::Memory* mem = bgfx::alloc(bokehSize*bokehSize*4);
+			bx::memSet(mem->data, 0x00, bokehSize*bokehSize*4);
+
+			const float thetaStep = 2.39996323f; // golden angle
+			const float radiusScale = 0.5f; // m_radiusScale;
+			float loopValue = radiusScale;
+			const float loopEnd = m_maxBlurSize;
+			float theta = 0.0;
+
+			while (loopValue < loopEnd)
+			{
+				float radius = loopValue;
+
+				// bokehShapeFromAngle (float numBlades=3.0, float angle=theta)
+				float shapeScale;
+				{
+					const float angle = theta;
+					const float invPeriod = 7.0f / (bx::kPi2);
+					float periodFraction = bx::fract(angle * invPeriod);
+					periodFraction = bx::abs(periodFraction - 0.5f);
+					shapeScale = 0.8f + periodFraction * 0.4f;//0.9f + (periodFraction * 0.2f);
+				}
+
+				float spiralCoordX = bx::cos(theta) * (radius * shapeScale);
+				float spiralCoordY = bx::sin(theta) * (radius * shapeScale);
+				// normalize for texture display
+				spiralCoordX /= m_maxBlurSize;
+				spiralCoordY /= m_maxBlurSize;
+				// shaping function can increase radius, divided by 1.25
+				spiralCoordX /= 1.25f;
+				spiralCoordY /= 1.25f;
+				// scale from -1,1 into 0,1 normalized texture space
+				spiralCoordX = spiralCoordX * 0.5f + 0.5f;
+				spiralCoordY = spiralCoordY * 0.5f + 0.5f;
+				// convert to pixel coordinates
+				uint32_t pixelCoordX = uint32_t(bx::floor(spiralCoordX * float(bokehSize-1) + 0.5f));
+				uint32_t pixelCoordY = uint32_t(bx::floor(spiralCoordY * float(bokehSize-1) + 0.5f));
+				assert(pixelCoordX < bokehSize);
+				assert(pixelCoordY < bokehSize);
+
+				// plot
+				uint32_t offset = (pixelCoordY * bokehSize + pixelCoordX) * 4;
+				mem->data[offset + 0] = 0xff;
+				mem->data[offset + 1] = 0xff;
+				mem->data[offset + 2] = 0xff;
+				mem->data[offset + 3] = 0xff;
+
+				theta += thetaStep;
+				loopValue += (radiusScale / loopValue);
+			}
+
+			// hoping texture deals with mem
+			m_bokehTexture = bgfx::createTexture2D(bokehSize, bokehSize, false, 1
+				, bgfx::TextureFormat::BGRA8
+				, 0
+				| BGFX_SAMPLER_MIN_POINT
+				| BGFX_SAMPLER_MIP_POINT
+				| BGFX_SAMPLER_MAG_POINT
+				, mem
+				);
+		}
+
 		imguiCreate();
 	}
 
@@ -521,6 +586,9 @@ public:
 
 			ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
 
+			//bool showDebug = true;
+			//ImGui::ShowDemoWindow(&showDebug);
+
 			{
 				ImGui::Checkbox("use bokeh dof", &m_useBokehDof);
 				if (ImGui::IsItemHovered())
@@ -680,6 +748,32 @@ public:
 
 				meshSubmit(m_meshes[MeshHollowCube], _pass, _program, mtx);
 			}
+		}
+
+		// draw box for bokeh texture
+		{
+			const float scale = 1.0f;
+			float mtx[16];
+			bx::mtxSRT(mtx
+				, scale
+				, scale
+				, scale
+				, 0.0f
+				, 0.0f
+				, 0.0f
+				, 10.0f
+				, 2.0f
+				, 0.0f
+				);
+
+			bgfx::setTexture(0, s_albedo, m_bokehTexture);
+			bgfx::setTexture(1, s_normal, m_normalTexture);
+			_uniforms.m_color[0] = 1.0f;
+			_uniforms.m_color[1] = 1.0f;
+			_uniforms.m_color[2] = 1.0f;
+			_uniforms.submit();
+
+			meshSubmit(m_meshes[MeshCube], _pass, _program, mtx);
 		}
 
 		// draw box as ground plane
@@ -946,6 +1040,7 @@ public:
 	Mesh* m_meshes[BX_COUNTOF(s_meshPaths)];
 	bgfx::TextureHandle m_groundTexture;
 	bgfx::TextureHandle m_normalTexture;
+	bgfx::TextureHandle m_bokehTexture;
 
 	uint32_t m_currFrame;
 	float m_lightRotation = 0.0f;
