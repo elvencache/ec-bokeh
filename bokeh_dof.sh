@@ -83,7 +83,7 @@ void GetColorAndBlurSize (
 #endif
 }
 
-float BokehShapeFromAngle (float lobeCount, float radiusMin, float radiusDelta2x, float angle)
+float BokehShapeFromAngle (float lobeCount, float radiusMin, float radiusDelta2x, float rotation, float angle)
 {
 	// don't shape for 0, 1 blades...
 	if (lobeCount <= 1.0f)
@@ -93,7 +93,7 @@ float BokehShapeFromAngle (float lobeCount, float radiusMin, float radiusDelta2x
 
 	// divide edge into some number of lobes 
 	float invPeriod = lobeCount / (2.0 * 3.1415926);
-	float periodFraction = fract(angle * invPeriod);
+	float periodFraction = fract(angle * invPeriod + rotation);
 
 	// apply triangle shape to each lobe to approximate blades of a camera aperture
 	periodFraction = abs(periodFraction - 0.5);
@@ -134,7 +134,12 @@ vec4 DepthOfField(
 	while (loopValue < loopEnd)
 	{
 		float radius = loopValue;
-		float shapeScale = BokehShapeFromAngle(u_lobeCount, u_lobeRadiusMin, u_lobeRadiusDelta2x, theta);
+		float shapeScale = BokehShapeFromAngle(
+			u_lobeCount,
+			u_lobeRadiusMin,
+			u_lobeRadiusDelta2x,
+			u_lobeRotation,
+			theta);
 		vec2 spiralCoord = texCoord + vec2(cos(theta), sin(theta)) * u_viewTexel.xy * (radius * shapeScale);
 
 		vec3 sampleColor;
@@ -148,6 +153,9 @@ vec4 DepthOfField(
 			/*out*/sampleColor,
 			/*out*/sampleSize);
 		float absSampleSize = abs(sampleSize);
+
+		// hax
+		sampleColor = sampleColor*sampleColor;
 
 		// using signed sample size as proxy for depth comparison
 		if (sampleSize > centerSize)

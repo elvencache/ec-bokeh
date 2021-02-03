@@ -11,6 +11,7 @@ uniform vec4 u_params[13];
 
 #define u_depthUnpackConsts			(u_params[0].xy)
 #define u_frameIdx					(u_params[0].z)
+#define u_lobeRotation				(u_params[0].w)
 #define u_ndcToViewMul				(u_params[1].xy)
 #define u_ndcToViewAdd				(u_params[1].zw)
 

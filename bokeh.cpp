@@ -43,25 +43,19 @@ namespace {
 enum Meshes
 {
 	MeshCube = 0,
-	MeshTree,
-	MeshHollowCube,
-	MeshBunny
+	MeshHollowCube
 };
 
 static const char * s_meshPaths[] =
 {
 	"meshes/cube.bin",
-	"meshes/tree.bin",
-	"meshes/hollowcube.bin",
-	"meshes/bunny.bin"
+	"meshes/hollowcube.bin"
 };
 
 static const float s_meshScale[] =
 {
 	0.45f,
-	0.25f,
-	0.30f,
-	0.25f
+	0.30f
 };
 
 // Vertex decl for our screen space quad (used in deferred rendering)
@@ -107,7 +101,7 @@ struct PassUniforms
 	{
 		struct
 		{
-			/* 0    */ struct { float m_depthUnpackConsts[2]; float m_frameIdx; float m_unused0; };
+			/* 0    */ struct { float m_depthUnpackConsts[2]; float m_frameIdx; float m_lobeRotation; };
 			/* 1    */ struct { float m_ndcToViewMul[2]; float m_ndcToViewAdd[2]; };
 			/* 2    */ struct { float m_blurSteps; float m_lobeCount; float m_lobeRadiusMin; float m_lobeRadiusDelta2x; };
 			/* 3    */ struct { float m_maxBlurSize; float m_focusPoint; float m_focusScale; float m_radiusScale; };
@@ -320,7 +314,7 @@ public:
 		m_texelHalf = bgfx::RendererType::Direct3D9 == renderer ? 0.5f : 0.0f;
 
 		m_bokehTexture.idx = bgfx::kInvalidHandle;
-		updateDisplayBokehTexture(m_radiusScale, m_maxBlurSize, m_lobeCount, (1.0f-m_lobePinch), 1.0f);
+		updateDisplayBokehTexture(m_radiusScale, m_maxBlurSize, m_lobeCount, (1.0f-m_lobePinch), 1.0f, m_lobeRotation);
 
 		imguiCreate();
 	}
@@ -515,7 +509,7 @@ public:
 				, ImGuiCond_FirstUseEver
 				);
 			ImGui::SetNextWindowSize(
-				ImVec2(m_width / 4.0f, m_height / 1.6f)
+				ImVec2(m_width / 4.0f, m_height / 1.4f)
 				, ImGuiCond_FirstUseEver
 				);
 			ImGui::Begin("Settings"
@@ -524,9 +518,6 @@ public:
 				);
 
 			ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
-
-			//bool showDebug = true;
-			//ImGui::ShowDemoWindow(&showDebug);
 
 			{
 				ImGui::Checkbox("use bokeh dof", &m_useBokehDof);
@@ -569,38 +560,34 @@ public:
 					ImGui::SetTooltip("multiply focus calculation, larger=tighter focus");
 				ImGui::Separator();
 
-				ImGui::Text("sample pattern controls:");
+				ImGui::Text("bokeh shape and sample controls:");
 				isChanged |= ImGui::SliderFloat("radiusScale", &m_radiusScale, 0.5f, 4.0f);
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("controls number of samples taken");
 
-				ImGui::TextWrapped(
-					"in original blog post, sample code has radius increasing by (radiusScale/currentRadius). "
-					"which should result in smaller steps farther from center. and fewer steps as radiusScale "
-					"increases. but it's less clear exactly how many steps that is, can be many."
-				);
-				const float maxRadius = m_maxBlurSize;
-				float radius = m_radiusScale;
-				int counter = 0;
-				while (radius < maxRadius)
-				{
-					++counter;
-					radius += m_radiusScale / radius;
-				}
-				char buffer[128] = {0};
-				bx::snprintf(buffer, 128-1, "number of samples taken: %d", counter);
-				ImGui::Text(buffer);
+				isChanged |= ImGui::SliderInt("lobe count", &m_lobeCount, 1, 8);
 				if (ImGui::IsItemHovered())
-					ImGui::SetTooltip("number of sample taps as determined by radiusScale");
+					ImGui::SetTooltip("using triangle lobes to emulate aperture blades");
 
-				isChanged |= ImGui::SliderInt("apertureBlades", &m_lobeCount, 1, 8);
 				isChanged |= ImGui::SliderFloat("lobe pinch", &m_lobePinch, 0.0f, 1.0f);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("adjust lobe shape, 0=round, 1=starry");
+
+				isChanged |= ImGui::SliderFloat("lobe rotation", &m_lobeRotation, -1.0f, 1.0f);
 
 				if (isChanged)
 				{
-					updateDisplayBokehTexture(m_radiusScale, m_maxBlurSize, m_lobeCount, (1.0f-m_lobePinch), 1.0f);
+					updateDisplayBokehTexture(m_radiusScale, m_maxBlurSize, m_lobeCount, (1.0f-m_lobePinch), 1.0f, m_lobeRotation);
 				}
-				
+
+				char buffer[128] = {0};
+				bx::snprintf(buffer, 128-1, "number of samples taken: %d", m_sampleCount);
+				ImGui::Text(buffer);
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("number of sample taps as determined by radiusScale and maxBlurSize");
+
+
+				ImGui::Image(m_bokehTexture, ImVec2(128.0f, 128.0f) );
 			}
 
 			ImGui::End();
@@ -675,32 +662,6 @@ public:
 
 				meshSubmit(m_meshes[MeshHollowCube], _pass, _program, mtx);
 			}
-		}
-
-		// draw box for bokeh texture
-		{
-			const float scale = 1.0f;
-			float mtx[16];
-			bx::mtxSRT(mtx
-				, scale
-				, scale
-				, scale
-				, 0.0f
-				, 0.0f
-				, 0.0f
-				, 10.0f
-				, 2.0f
-				, 0.0f
-				);
-
-			bgfx::setTexture(0, s_albedo, m_bokehTexture);
-			bgfx::setTexture(1, s_normal, m_normalTexture);
-			_uniforms.m_color[0] = 1.0f;
-			_uniforms.m_color[1] = 1.0f;
-			_uniforms.m_color[2] = 1.0f;
-			_uniforms.submit();
-
-			meshSubmit(m_meshes[MeshCube], _pass, _program, mtx);
 		}
 
 		// draw box as ground plane
@@ -920,10 +881,11 @@ public:
 			m_uniforms.m_focusPoint = m_focusPoint;
 			m_uniforms.m_focusScale = m_focusScale;
 			m_uniforms.m_radiusScale = m_radiusScale * blurScale;
+			m_uniforms.m_lobeRotation = m_lobeRotation;
 		}
 	}
 
-	static float bokehShapeFromAngle (int _lobeCount, float _radiusMin, float _radiusDelta2x, float _theta)
+	static float bokehShapeFromAngle (int _lobeCount, float _radiusMin, float _radiusDelta2x, float _rotation, float _theta)
 	{
 		// don't shape for 0, 1 blades...
 		if (_lobeCount <= 1)
@@ -933,14 +895,20 @@ public:
 
 		// divide edge into some number of lobes 
 		const float invPeriod = float(_lobeCount) / (bx::kPi2);
-		float periodFraction = bx::fract(_theta * invPeriod);
+		float periodFraction = bx::fract(_theta * invPeriod + _rotation);
 
 		// apply triangle shape to each lobe to approximate blades of a camera aperture
 		periodFraction = bx::abs(periodFraction - 0.5f);
 		return periodFraction * _radiusDelta2x + _radiusMin;
 	}
 
-	void updateDisplayBokehTexture(float _radiusScale, float _maxBlurSize, int _lobeCount, float _lobeRadiusMin, float _lobeRadiusMax)
+	void updateDisplayBokehTexture(
+		float _radiusScale,
+		float _maxBlurSize,
+		int _lobeCount,
+		float _lobeRadiusMin,
+		float _lobeRadiusMax,
+		float _lobeRotation)
 	{
 		if (m_bokehTexture.idx != bgfx::kInvalidHandle)
 		{
@@ -956,17 +924,18 @@ public:
 		const float thetaStep = 2.39996323f; // golden angle
 		float loopValue = _radiusScale;
 		const float loopEnd = _maxBlurSize;
-		float theta = 0.0;
+		float theta = 0.0f;
 
 		// bokeh shape function multiples this by half later
 		const float radiusDelta2x = 2.0f * (_lobeRadiusMax - _lobeRadiusMin);
+		int32_t counter = 0;
 
 		while (loopValue < loopEnd)
 		{
 			float radius = loopValue;
 
 			// apply shape to circular distribution
-			const float shapeScale = bokehShapeFromAngle(_lobeCount, _lobeRadiusMin, radiusDelta2x, theta);
+			const float shapeScale = bokehShapeFromAngle(_lobeCount, _lobeRadiusMin, radiusDelta2x, _lobeRotation, theta);
 			BX_ASSERT(_lobeRadiusMin <= shapeScale);
 			BX_ASSERT(shapeScale <= _maxRadius);
 
@@ -987,16 +956,18 @@ public:
 			BX_ASSERT(pixelCoordX < bokehSize);
 			BX_ASSERT(pixelCoordY < bokehSize);
 
-			// plot sample position
+			// plot sample position, track for total samples
 			uint32_t offset = (pixelCoordY * bokehSize + pixelCoordX) * 4;
 			mem->data[offset + 0] = 0xff;
 			mem->data[offset + 1] = 0xff;
 			mem->data[offset + 2] = 0xff;
 			mem->data[offset + 3] = 0xff;
+			++counter;
 
 			theta += thetaStep;
 			loopValue += (_radiusScale / loopValue);
 		}
+		m_sampleCount = counter;
 
 		// hoping texture deals with mem
 		m_bokehTexture = bgfx::createTexture2D(bokehSize, bokehSize, false, 1
@@ -1080,6 +1051,8 @@ public:
 	bool m_showDebugVisualization = false;
 	int32_t m_lobeCount = 6;
 	float m_lobePinch = 0.2f;
+	float m_lobeRotation = 0.0f;
+	int32_t m_sampleCount = 0;
 };
 
 } // namespace
