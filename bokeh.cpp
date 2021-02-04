@@ -581,9 +581,7 @@ public:
 					updateDisplayBokehTexture(m_radiusScale, m_maxBlurSize, m_lobeCount, (1.0f-m_lobePinch), 1.0f, m_lobeRotation);
 				}
 
-				char buffer[128] = {0};
-				bx::snprintf(buffer, 128-1, "number of samples taken: %d", m_sampleCount);
-				ImGui::Text(buffer);
+				ImGui::Text("number of samples taken: %d", m_sampleCount);
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("number of sample taps as determined by radiusScale and maxBlurSize");
 
