@@ -276,7 +276,8 @@ public:
 		// Create program from shaders.
 		m_forwardProgram			= loadProgram("vs_bokeh_forward",		"fs_bokeh_forward");
 		m_gridProgram				= loadProgram("vs_bokeh_forward",		"fs_bokeh_forward_grid");
-		m_copyProgram				= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_copy"); 
+		m_copyProgram				= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_copy");
+		m_copyLinearToGammaProgram	= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_copy_linear_to_gamma");
 		m_linearDepthProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_linear_depth");
 		m_dofSinglePassProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_single_pass");
 		m_dofDownsampleProgram		= loadProgram("vs_bokeh_screenquad",	"fs_bokeh_dof_downsample");
@@ -333,6 +334,7 @@ public:
 		bgfx::destroy(m_forwardProgram);
 		bgfx::destroy(m_gridProgram);
 		bgfx::destroy(m_copyProgram);
+		bgfx::destroy(m_copyLinearToGammaProgram);
 		bgfx::destroy(m_linearDepthProgram);
 		bgfx::destroy(m_dofSinglePassProgram);
 		bgfx::destroy(m_dofDownsampleProgram);
@@ -406,7 +408,6 @@ public:
 			bx::mtxProj(m_proj, m_fovY, float(m_size[0]) / float(m_size[1]), 0.01f, 100.0f, caps->homogeneousDepth);
 			bx::mtxProj(m_proj2, m_fovY, float(m_size[0]) / float(m_size[1]), 0.01f, 100.0f, false);
 
-
 			bgfx::ViewId view = 0;
 
 			// Draw models into scene
@@ -414,7 +415,7 @@ public:
 				bgfx::setViewName(view, "forward scene");
 				bgfx::setViewClear(view
 					, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH
-					, 0xbbddffff // clear to a sky blue
+					, 0x7fb8ffff // clear to a sky blue
 					, 1.0f
 					, 0
 				);
@@ -487,7 +488,7 @@ public:
 					);
 				bgfx::setTexture(0, s_color, m_frameBufferTex[FRAMEBUFFER_RT_COLOR]);
 				screenSpaceQuad(float(m_width), float(m_height), m_texelHalf, caps->originBottomLeft);
-				bgfx::submit(view, m_copyProgram);
+				bgfx::submit(view, m_copyLinearToGammaProgram);
 				++view;
 			}
 
@@ -807,7 +808,7 @@ public:
 			| BGFX_SAMPLER_V_CLAMP
 			;
 
-		m_frameBufferTex[FRAMEBUFFER_RT_COLOR] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::BGRA8, bilinearFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_COLOR] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::RGBA16F, bilinearFlags);
 		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, bilinearFlags);
 		m_frameBuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_frameBufferTex), m_frameBufferTex, true);
 
@@ -992,6 +993,7 @@ public:
 	bgfx::ProgramHandle m_forwardProgram;
 	bgfx::ProgramHandle m_gridProgram;
 	bgfx::ProgramHandle m_copyProgram;
+	bgfx::ProgramHandle m_copyLinearToGammaProgram;
 	bgfx::ProgramHandle m_linearDepthProgram;
 	bgfx::ProgramHandle m_dofSinglePassProgram;
 	bgfx::ProgramHandle m_dofDownsampleProgram;
@@ -1042,11 +1044,11 @@ public:
 
 	// UI parameters
 	bool m_useBokehDof = true;
-	bool m_useSinglePassBokehDof = true;
+	bool m_useSinglePassBokehDof = false;
 	float m_maxBlurSize = 20.0f;
 	float m_focusPoint = 5.0f;
 	float m_focusScale = 3.0f;
-	float m_radiusScale = 3.856f;//0.5f;
+	float m_radiusScale = 0.5f;
 	float m_blurSteps = 50.0f;
 	bool m_showDebugVisualization = false;
 	int32_t m_lobeCount = 6;
