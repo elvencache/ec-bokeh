@@ -154,9 +154,6 @@ vec4 DepthOfField(
 			/*out*/sampleSize);
 		float absSampleSize = abs(sampleSize);
 
-		// hax
-		sampleColor = sampleColor*sampleColor;
-
 		// using signed sample size as proxy for depth comparison
 		if (sampleSize > centerSize)
 		{
