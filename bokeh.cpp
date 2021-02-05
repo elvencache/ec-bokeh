@@ -5,7 +5,7 @@
 
 /*
 * Implement bokeh depth of field as described in the blog post here:
-* https://blog.tuxedolabs.com/2018/05/04/bokeh-depth-of-field-in-single-pass.html
+* https://web.archive.org/web/20201215123940/https://blog.tuxedolabs.com/2018/05/04/bokeh-depth-of-field-in-single-pass.html
 *
 * Additionally, implement the optimizations discussed in the closing paragraph.
 * Apply the effect in multiple passes. Calculate the circle of confusion and store
@@ -223,14 +223,6 @@ void vec2Set(float* _v, float _x, float _y)
 	_v[1] = _y;
 }
 
-void vec4Set(float* _v, float _x, float _y, float _z, float _w)
-{
-	_v[0] = _x;
-	_v[1] = _y;
-	_v[2] = _z;
-	_v[3] = _w;
-}
-
 class ExampleBokeh : public entry::AppI
 {
 public:
@@ -296,7 +288,7 @@ public:
 
 		m_recreateFrameBuffers = false;
 		createFramebuffers();
-	
+
 		// Vertex decl
 		PosTexCoord0Vertex::init();
 
@@ -510,7 +502,7 @@ public:
 				, ImGuiCond_FirstUseEver
 				);
 			ImGui::SetNextWindowSize(
-				ImVec2(m_width / 4.0f, m_height / 1.4f)
+				ImVec2(m_width / 4.0f, m_height / 1.35f)
 				, ImGuiCond_FirstUseEver
 				);
 			ImGui::Begin("Settings"
@@ -544,7 +536,6 @@ public:
 				}
 				ImGui::Separator();
 
-				// track changed
 				bool isChanged = false;
 
 				ImGui::Text("blur controls:");
@@ -807,7 +798,7 @@ public:
 			;
 
 		m_frameBufferTex[FRAMEBUFFER_RT_COLOR] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::RGBA16F, bilinearFlags);
-		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D24, bilinearFlags);
+		m_frameBufferTex[FRAMEBUFFER_RT_DEPTH] = bgfx::createTexture2D(uint16_t(m_size[0]), uint16_t(m_size[1]), false, 1, bgfx::TextureFormat::D32F,    bilinearFlags);
 		m_frameBuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_frameBufferTex), m_frameBufferTex, true);
 
 		m_linearDepth.init(m_size[0], m_size[1], bgfx::TextureFormat::R16F, bilinearFlags);

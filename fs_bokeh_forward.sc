@@ -1,5 +1,10 @@
 $input v_normal, v_texcoord0, v_texcoord1, v_texcoord2
 
+/*
+* Copyright 2021 elven cache. All rights reserved.
+* License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+*/
+
 #include "../common/common.sh"
 
 SAMPLER2D(s_albedo, 0);
