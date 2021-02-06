@@ -7,7 +7,7 @@
 #define PARAMETERS_SH
 
 // struct PassUniforms
-uniform vec4 u_params[13];
+uniform vec4 u_params[4];
 
 #define u_depthUnpackConsts			(u_params[0].xy)
 #define u_frameIdx					(u_params[0].z)
